@@ -1,0 +1,1291 @@
+---
+title: "Return, Volatility, and Log Price and More"
+author: "bbaasan"
+date: "2025-06-06"
+output:
+  html_document:
+    df_print: paged
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+
+```{r loadLib, comment=NA, warning=FALSE, message=FALSE}
+library(tidyverse)
+library(readxl)
+library(dplyr)
+library(car)
+library(nortest)
+library(rugarch)
+library(patchwork)
+library(tseries)
+```
+
+## Load data
+```{r load_afm, comment=NA, warning=FALSE, message=FALSE}
+afm = read_excel('../data2/AFM_experiment-spreadsheet.xlsx', sheet = 'Values')
+etf = read_excel('../data2/ETF_experiment-spreadsheet.xlsx', sheet = 'Values')
+```
+
+
+## AFM Price data MNS = 0.20 BP = 0.20 0.50, 0.75
+```{r afm_price_mns020, comment=NA, warning=FALSE}
+new_names_as_strings = as.numeric(0:1080)
+
+names(afm) = new_names_as_strings 
+
+afm_price_mns020_bp025 = afm %>%             # afm raw data
+  select(all_of(seq(2, 120, 3))) %>%         # columns: price mns=020 bp = 0.25
+  slice(13:nrow(.)) %>%                      # drop meta data
+  mutate(across(everything(), as.numeric))   # since string is removed 
+                                             # save dtype numeric
+
+afm_price_mns020_bp050 = afm %>%
+  select(all_of(seq(122, 241, 3))) %>% 
+  slice(13:nrow(.)) %>% 
+  mutate(across(everything(), as.numeric)) 
+
+afm_price_mns020_bp075 = afm %>%
+  select(all_of(seq(242, 361, 3))) %>% 
+  slice(13:nrow(.)) %>% 
+  mutate(across(everything(), as.numeric)) 
+
+```
+
+## AFM Return data MNS = 0.20 BP = 0.20 0.50, 0.75
+```{r afm_return_mns020, comment=NA, warning=FALSE, message=FALSE}
+afm_return_mns020_bp025 = afm %>% 
+  select(all_of(seq(3, 122, 3))) %>% 
+  slice(13:nrow(.))%>% 
+  mutate(across(everything(), as.numeric))
+
+afm_return_mns020_bp050 = afm %>%
+  select(all_of(seq(123, 240, 3))) %>% 
+  slice(13:nrow(.))%>% 
+  mutate(across(everything(), as.numeric))
+
+afm_return_mns020_bp075 = afm %>%
+  select(all_of(seq(243, 360, 3))) %>% 
+  slice(13:nrow(.))%>% 
+  mutate(across(everything(), as.numeric))
+```
+
+## AFM Volatility data MNS = 0.20 BP = 0.20 0.50, 0.75
+```{r afm_vol_mns, comment=NA, warning=FALSE, message=FALSE}
+afm_vol_mns020_bp025 = afm %>%
+  select(all_of(seq(4, 123, 3))) %>% 
+  slice(13:nrow(.))%>% 
+  mutate(across(everything(), as.numeric))
+
+afm_vol_mns020_bp050 = afm %>%
+  select(all_of(seq(124, 241, 3))) %>% 
+  slice(13:nrow(.))%>% 
+  mutate(across(everything(), as.numeric))
+
+afm_vol_mns020_bp075 = afm %>%
+  select(all_of(seq(244, 361, 3))) %>% 
+  slice(13:nrow(.))%>% 
+  mutate(across(everything(), as.numeric))
+```
+
+## ETF Price Data MNS = 0.20 BP = 0.20 0.50, 0.75
+```{r etf_price_mns020, warning=FALSE, message=FALSE}
+names(etf) = new_names_as_strings 
+
+etf_price_mns020_bp025 = etf %>%
+  select(all_of(seq(2, 120, 3))) %>% 
+  slice(14:nrow(.))%>% 
+  mutate(across(everything(), as.numeric))
+
+etf_price_mns020_bp050 = etf %>%
+  select(all_of(seq(122, 241, 3))) %>% 
+  slice(14:nrow(.))%>% 
+  mutate(across(everything(), as.numeric))
+
+etf_price_mns020_bp075 = etf %>%
+  select(all_of(seq(242, 361, 3))) %>% 
+  slice(14:nrow(.))%>% 
+  mutate(across(everything(), as.numeric))
+```
+
+## ETF Return Data MNS = 0.20 BP = 0.20 0.50, 0.75
+```{r etf_return_mns020, warning=FALSE, comment=NA, message=FALSE}
+etf_return_mns020_bp025 = etf %>% 
+  select(all_of(seq(3, 122, 3))) %>% 
+  slice(14:nrow(.))%>% 
+  mutate(across(everything(), as.numeric))
+
+etf_return_mns020_bp050 = etf %>%
+  select(all_of(seq(123, 240, 3))) %>% 
+  slice(14:nrow(.))%>% 
+  mutate(across(everything(), as.numeric))
+
+etf_return_mns020_bp075 = etf %>%
+  select(all_of(seq(243, 360, 3))) %>% 
+  slice(14:nrow(.))%>% 
+  mutate(across(everything(), as.numeric))
+
+```
+
+## ETF Volatility MNS = 0.20 BP = 0.20 0.50, 0.75
+```{r etf_vol, warning=FALSE, message=FALSE}
+etf_vol_mns020_bp025 = etf %>%
+  select(all_of(seq(4, 123, 3))) %>% 
+  slice(14:nrow(.))%>% 
+  mutate(across(everything(), as.numeric))
+
+etf_vol_mns020_bp050 = etf %>%
+  select(all_of(seq(124, 241, 3))) %>% 
+  slice(14:nrow(.))%>% 
+  mutate(across(everything(), as.numeric))
+
+etf_vol_mns020_bp075 = etf %>%
+  select(all_of(seq(244, 361, 3))) %>% 
+  slice(14:nrow(.))%>% 
+  mutate(across(everything(), as.numeric))
+
+```
+
+# Histogram function
+```{r histogamPlotFunction, warning=FALSE}
+
+plot_function = function(data){
+  for (i in colnames(data)) {
+
+  data_1d_array <- data[[i]]
+  
+  ggplot(data.frame(value = data_1d_array), aes(x = value)) +
+    geom_histogram(aes(y = after_stat(density)),
+                   bins = 30,           # or adjust `binwidth = ...`
+                   fill = "skyblue",
+                   color = "black",
+                   alpha = 0.7) +
+    geom_density(color = "red", linewidth = 1.2) +
+    labs(title = paste("Distribution of", i),
+         x = i,
+         y = "Density") +
+    theme_minimal() -> p
+
+  print(p)
+  }
+}
+```
+
+
+```{r plotAfm_vol, warning=FALSE}
+plot_function(afm_vol_mns020_bp025[,1:3]) # first 3 cols but adjust as needed
+```
+
+```{r plotEtf, warning=FALSE}
+plot_function(etf_vol_mns020_bp025[,1:3]) # adjust as needed
+```
+
+```{r summmaryStatsFunction, warning=FALSE}
+
+summary_stats <- function(data) {
+  out <- vector("list", length = ncol(data))
+
+  for (j in seq_along(data)) {
+    x <- na.omit(data[[j]])
+    col_nm <- colnames(data)[j]
+
+    if (length(unique(x)) < 3) {         # Shapiro needs ≥ 3 distinct values
+      out[[j]] <- data.frame(
+        variable   = col_nm,
+        n          = length(x),
+        mean       = mean(x),
+        sd         = sd(x),
+        shapiro_p  = NA_real_,          # test the assumption of normality
+        ad_p       = NA_real_           # H0: data is normally distributed pv0.05
+      )
+    } else {
+      sh <- shapiro.test(x)$p.value
+      ad <- ad.test(x)$p.value          # Anderson-Darling (more power in tails)
+
+      out[[j]] <- data.frame(
+        variable   = col_nm,
+        n          = length(x),
+        mean       = mean(x),
+        sd         = sd(x),
+        shapiro_p  = sh,
+        ad_p       = ad                # 
+      )
+    }
+  }
+
+  do.call(rbind, out)
+}
+
+```
+
+
+```{r summaryStatsPlot}
+summary_stats(etf_price_mns020_bp075) %>% 
+  # filter(shapiro_p < 0.05) # non-normality
+  select(mean, sd) %>% 
+  plot_function()
+```
+```{r compareMeanVarFunction, warning=FALSE, message=FALSE}
+
+compare_cols = function(df1, df2) {
+  
+  #library(car)
+  common_cols <- intersect(colnames(df1), colnames(df2))
+  out <- vector("list", length(common_cols))
+
+  for (j in seq_along(common_cols)) {
+
+    nm <- common_cols[j]
+    x  <- stats::na.omit(df1[[nm]])
+    y  <- stats::na.omit(df2[[nm]])
+
+    # Skip empty / constant columns
+    if (length(x) < 2 || length(y) < 2 || sd(x) == 0 || sd(y) == 0) {
+      out[[j]] <- data.frame(
+        variable   = nm,
+        n1 = length(x), mean1 = mean(x), sd1 = sd(x),
+        n2 = length(y), mean2 = mean(y), sd2 = sd(y),
+        t_p       = NA_real_,
+        var_p     = NA_real_,
+        levene_p  = NA_real_
+      )
+      next
+    }
+
+    t_p      <- t.test(x, y)$p.value               # car package Welch by default
+    var_p    <- var.test(x, y)$p.value             # classic F test
+    lev_p    <- car::leveneTest(
+                  c(x, y),
+                  factor(rep(c("g1", "g2"),
+                             c(length(x), length(y))))
+                )$`Pr(>F)`[1]
+
+    out[[j]] <- data.frame(
+      variable   = nm,
+      n1 = length(x), mean1 = mean(x), sd1 = sd(x),
+      n2 = length(y), mean2 = mean(y), sd2 = sd(y),
+      t_p       = t_p,
+      var_p     = var_p,
+      levene_p  = lev_p
+    )
+  }
+
+  do.call(rbind, out)
+}
+```
+
+
+```{r compareMeanVar, comment=NA}
+compare_cols(afm_vol_mns020_bp025, etf_vol_mns020_bp025) %>% 
+  filter(t_p < 0.05) %>% 
+  summarise()
+
+```
+```{r columnsComparedFunction}
+plot_compare_cols <- function(df1, df2) {
+
+  common_cols <- intersect(colnames(df1), colnames(df2))
+
+  for (col in common_cols) {
+    x <- na.omit(df1[[col]])
+    y <- na.omit(df2[[col]])
+
+    if (length(x) < 2 || length(y) < 2) next  # skip empty/constant columns
+
+    df_plot <- data.frame(
+      value = c(x, y),
+      group = rep(c("AFM", "ETF"), c(length(x), length(y)))
+    )
+
+    p <- ggplot(df_plot, aes(x = value, fill = group)) +
+      geom_histogram(aes(y = after_stat(density)), position = "identity",
+                     alpha = 0.5, bins = 30, color = "black") +
+      geom_density(alpha = 0.7, linewidth = 1.2, aes(color = group)) +
+      labs(title = paste("Distribution of", col),
+           x = col,
+           y = "Density") +
+      theme_minimal()
+
+    print(p)
+  }
+}
+```
+
+```{r volColCompared}
+
+plot_compare_cols(afm_vol_mns020_bp025, etf_vol_mns020_bp025)
+
+```
+
+
+
+
+```{r mns020_bp075_compared}
+plot_compare_cols(afm_vol_mns020_bp075, etf_vol_mns020_bp075)
+
+```
+
+
+```{r mns020_bp075_compared}
+plot_compare_cols(afm_return_mns020_bp075, etf_return_mns020_bp075)
+
+```
+```{r convoluteColFunction}
+
+plot_convoluted_columns <- function(df1, df2) {
+
+  common_cols <- intersect(colnames(df1), colnames(df2))
+
+  for (col in common_cols) {
+    x <- na.omit(df1[[col]])
+    y <- na.omit(df2[[col]])
+
+    if (length(x) < 2 || length(y) < 2) next
+
+    df_plot <- data.frame(
+      value = c(x, y),
+      source = rep(c("AFM", "ETF"), c(length(x), length(y)))
+    )
+
+    p <- ggplot(df_plot, aes(x = value, fill = source)) +
+      geom_histogram(aes(y = after_stat(density)), bins = 30,
+                     position = "identity", alpha = 0.2, color = "black") +
+      geom_density(aes(color = source), linewidth = 1.2) +
+      labs(title = paste("Convoluted Histogram of", col),
+           x = col,
+           y = "Density") +
+      theme_minimal()
+
+    print(p)
+  }
+}
+```
+
+```{r convoluteData}
+
+plot_convoluted_columns(afm_vol_mns020_bp025, etf_vol_mns020_bp025)
+```
+```{r}
+plot_convoluted_columns2 <- function(df1, df2) {
+
+  common_cols <- intersect(colnames(df1), colnames(df2))
+
+  for (col in common_cols) {
+    x <- na.omit(df1[[col]])
+    y <- na.omit(df2[[col]])
+
+    if (length(x) < 2 || length(y) < 2) next
+
+    df_plot <- data.frame(
+      value = c(x, y),
+      source = rep(c("AFM", "ETF"), c(length(x), length(y)))
+    )
+
+    p <- ggplot(df_plot, aes(x = value, fill = source)) +
+      geom_histogram(aes(y = after_stat(density)),
+                     position = "identity", bins = 30, color = "black",
+                     alpha = 0.6) +  # base alpha; overridden below
+      geom_density(aes(color = source), linewidth = 1.2) +
+      scale_fill_manual(values = c("AFM" = rgb(1, 0, 0, 0.5),     # red, semi-opaque
+                                   "ETF" = rgb(0, 1, 0, 0.2))) +  # green, more transparent
+      scale_color_manual(values = c("AFM" = "red", "ETF" = "darkgreen")) +
+      labs(title = paste("Overlayed Distribution of", col),
+           x = col,
+           y = "Density") +
+      theme_minimal()
+
+    print(p)
+  }
+}
+
+```
+
+```{r}
+plot_convoluted_columns2(afm_vol_mns020_bp075, etf_vol_mns020_bp075)
+```
+
+```{r saveAllFunction}
+
+plot_convoluted_columns3 <- function(df1, df2, output_file = "/Users/alina/Desktop/convoluted_all_plots.pdf") {
+
+  common_cols <- intersect(colnames(df1), colnames(df2))
+  plot_list <- list()
+
+  for (col in common_cols) {
+    x <- na.omit(df1[[col]])
+    y <- na.omit(df2[[col]])
+
+    if (length(x) < 2 || length(y) < 2) next
+
+    df_plot <- data.frame(
+      value = c(x, y),
+      source = rep(c("AFM", "ETF"), c(length(x), length(y)))
+    )
+
+    p <- ggplot(df_plot, aes(x = value, fill = source)) +
+      geom_histogram(aes(y = after_stat(density)),
+                     position = "identity", bins = 30, color = "black",
+                     alpha = 0.5) +
+      geom_density(aes(color = source), linewidth = 1) +
+      scale_fill_manual(values = c("AFM" = rgb(1, 0, 0, 0.5),
+                                   "ETF" = rgb(0, 1, 0, 0.2))) +
+      scale_color_manual(values = c("AFM" = "red", "ETF" = "darkgreen")) +
+      labs(title = paste("Overlayed Distribution of", col),
+           x = col,
+           y = "Density") +
+      theme_minimal() +
+      theme(plot.title = element_text(size = 8),
+            axis.text = element_text(size = 6),
+            axis.title = element_text(size = 7),
+            legend.position = "none")
+
+    plot_list[[col]] <- p
+  }
+
+  combined_plot <- wrap_plots(plot_list, ncol = 8)
+
+ # If output_file is provided, save as PDF
+  if (!is.null(output_file)) {
+    ggsave(output_file, combined_plot, width = 16, height = 10, units = "in")
+  } else {
+    print(combined_plot)  # Fallback: just display the plot
+  }
+}
+
+```
+
+```{r savePlot}
+plot_convoluted_columns3(afm_vol_mns020_bp075, etf_vol_mns020_bp075, NULL) #'/Users/alina/Desktop/vol_mns020_bp075.pdf')
+#getwd()
+```
+
+## AFM Price MNS = 0.4 BP = 0.25 0.50 0.75
+```{r afm_price_mns040, comment=NA, warning=FALSE, message=FALSE}
+
+afm_price_mns040_bp025 = afm %>% 
+  select(all_of(seq(362, 481, 3))) %>% 
+  slice(13:nrow(.)) %>%                      # drop meta data
+  mutate(across(everything(), as.numeric))
+
+afm_price_mns040_bp050 = afm %>% 
+  select(all_of(seq(482,600, 3))) %>% 
+  slice(13:nrow(.)) %>%                      # drop meta data
+  mutate(across(everything(), as.numeric))
+  
+afm_price_mns040_bp075 = afm %>% 
+  select(all_of(seq(602,720, 3))) %>% 
+  slice(13:nrow(.)) %>%                      # drop meta data
+  mutate(across(everything(), as.numeric))
+
+```
+
+## AFM Return MNS = 0.40 BP = 0.25 0.50 0.75
+```{r afm_return_mns040, comment=NA, warning=FALSE, message=FALSE}
+
+afm_return_mns040_bp025 = afm %>% 
+  select(all_of(seq(363,482, 3))) %>% 
+  slice(13:nrow(.)) %>%                      # drop meta data
+  mutate(across(everything(), as.numeric))
+
+afm_return_mns040_bp050 = afm %>% 
+  select(all_of(seq(483,601, 3))) %>% 
+  slice(13:nrow(.)) %>%                      # drop meta data
+  mutate(across(everything(), as.numeric))
+
+afm_return_mns040_bp075 = afm %>% 
+  select(all_of(seq(603,721, 3))) %>% 
+  slice(13:nrow(.)) %>%                      # drop meta data
+  mutate(across(everything(), as.numeric))
+```
+
+
+## AFM Volatility MNS = 0.40 BP = 0.25 0.50 0.75
+```{r afm_vol_mns040, comment=NA, warning=FALSE, message=FALSE}
+afm_vol_mns040_bp025 = afm %>% 
+  select(all_of(seq(364,483, 3))) %>% 
+  slice(13:nrow(.)) %>%                      # drop meta data
+  mutate(across(everything(), as.numeric))
+
+afm_vol_mns040_bp050 = afm %>% 
+  select(all_of(seq(484, 602, 3))) %>% 
+  slice(13:nrow(.)) %>%                      # drop meta data
+  mutate(across(everything(), as.numeric))
+
+afm_vol_mns040_bp075 = afm %>%         # 
+  select(all_of(seq(604, 722, 3))) %>% 
+  slice(13:nrow(.)) %>%                      # drop meta data
+  mutate(across(everything(), as.numeric))
+
+```
+
+
+## ETF Price MNS = 0.40 BP = 0.25 0.50 0.75
+```{r etf_price_mns040, comment=NA, warning=FALSE, message=FALSE}
+etf_price_mns040_bp025 = etf %>% 
+  select(all_of(seq(362, 481, 3))) %>% 
+  slice(14:nrow(.)) %>%                      # drop meta data
+  mutate(across(everything(), as.numeric))
+
+etf_price_mns040_bp050 = etf %>% 
+  select(all_of(seq(482, 600, 3)))%>% 
+  slice(14:nrow(.)) %>%                      # drop meta data
+  mutate(across(everything(), as.numeric))
+
+etf_price_mns040_bp075 = etf %>% 
+  select(all_of(seq(602, 720, 3)))%>% 
+  slice(14:nrow(.)) %>%                      # drop meta data
+  mutate(across(everything(), as.numeric))
+
+```
+
+## ETF Return MNS = 0.40 BP = 0.25 0.50 0.75
+```{r etf_return_mns040, comment=NA, warning=FALSE, message=FALSE}
+
+etf_return_mns040_bp025 = etf %>% 
+  select(all_of(seq(363,482, 3)))%>% 
+  slice(14:nrow(.)) %>%                      # drop meta data
+  mutate(across(everything(), as.numeric))
+
+etf_return_mns040_bp050 = etf %>% 
+  select(all_of(seq(483,601, 3)))%>% 
+  slice(14:nrow(.)) %>%                      # drop meta data
+  mutate(across(everything(), as.numeric))
+
+etf_return_mns040_bp075 = etf %>% 
+  select(all_of(seq(603,721, 3)))%>% 
+  slice(14:nrow(.)) %>%                      # drop meta data
+  mutate(across(everything(), as.numeric))
+
+```
+
+
+## ETF Volatility MNS = 0.40 BP = 0.25 0.50 0.75
+```{r etf_vol_mns040, comment=NA, warning=FALSE, message=FALSE}
+etf_vol_mns040_bp025 = etf %>% 
+  select(all_of(seq(364,483, 3)))%>% 
+  slice(14:nrow(.)) %>%                      # drop meta data
+  mutate(across(everything(), as.numeric))
+
+etf_vol_mns040_bp050 = etf %>% 
+  select(all_of(seq(484, 602, 3)))%>% 
+  slice(14:nrow(.)) %>%                      # drop meta data
+  mutate(across(everything(), as.numeric))
+
+etf_vol_mns040_bp075 = etf %>% 
+  select(all_of(seq(604, 722, 3)))%>% 
+  slice(14:nrow(.)) %>%                      # drop meta data
+  mutate(across(everything(), as.numeric))
+
+```
+
+
+## AFM Price MNS = 0.60 BP = 0.25 0.50 0.75
+```{r afm_price_mns060, comment=NA, warning=FALSE, message=FALSE}
+afm_price_mns060_bp025 = afm %>% 
+  select(all_of(seq(722, 840, 3)))%>% 
+  slice(13:nrow(.)) %>%                      # drop meta data
+  mutate(across(everything(), as.numeric))
+
+afm_price_mns060_bp050 = afm %>% 
+  select(all_of(seq(842, 960, 3)))%>% 
+  slice(13:nrow(.)) %>%                      # drop meta data
+  mutate(across(everything(), as.numeric))
+
+afm_price_mns060_bp075 = afm %>% 
+  select(all_of(seq(962, 1080, 3))) %>% 
+  slice(13:nrow(.)) %>%                      # drop meta data
+  mutate(across(everything(), as.numeric))
+
+```
+
+## AFM Return MNS = 0.60 BP = 0.25 0.50 0.75
+```{r afm_return_mns060, comment=NA, warning=FALSE, message=FALSE}
+afm_return_mns060_bp025 = afm %>% 
+  select(all_of(seq(723, 840, 3))) %>% 
+  slice(13:nrow(.)) %>%                      # drop meta data
+  mutate(across(everything(), as.numeric))
+
+afm_return_mns060_bp050 = afm %>% 
+  select(all_of(seq(843, 960, 3))) %>% 
+  slice(13:nrow(.)) %>%                      # drop meta data
+  mutate(across(everything(), as.numeric))
+
+afm_return_mns060_bp075 = afm %>% 
+  select(all_of(seq(963, 1081, 3))) %>% 
+  slice(13:nrow(.)) %>%                      # drop meta data
+  mutate(across(everything(), as.numeric))
+
+```
+
+## AFM Volatility MNS = 0.60 BP = 0.25 0.50 0.75
+```{r afm_vol_mns060, comment=NA, warning=FALSE, message=FALSE}
+afm_vol_mns060_bp025 = afm %>% 
+  select(all_of(seq(724, 841, 3))) %>% 
+  slice(13:nrow(.)) %>%                      # drop meta data
+  mutate(across(everything(), as.numeric))
+
+afm_vol_mns060_bp050 = afm %>% 
+  select(all_of(seq(844, 961, 3))) %>% 
+  slice(13:nrow(.)) %>%                      # drop meta data
+  mutate(across(everything(), as.numeric))
+
+afm_vol_mns060_bp075 = afm %>% 
+  select(all_of(seq(964, 1081, 3))) %>% 
+  slice(13:nrow(.)) %>%                      # drop meta data
+  mutate(across(everything(), as.numeric))
+
+```
+
+
+## ETF Price MNS = 0.60 BP = 0.25 0.50 0.75
+```{r etf_price_mns060, comment=NA, warning=FALSE, message=FALSE}
+etf_price_mns060_bp025 = etf %>% 
+  select(all_of(seq(722, 840, 3))) %>% 
+  slice(14:nrow(.)) %>%                      # drop meta data
+  mutate(across(everything(), as.numeric))
+
+etf_price_mns060_bp050 = etf %>% 
+  select(all_of(seq(842, 960, 3))) %>% 
+  slice(14:nrow(.)) %>%                      # drop meta data
+  mutate(across(everything(), as.numeric))
+
+etf_price_mns060_bp075 = etf %>% 
+  select(all_of(seq(962, 1080, 3))) %>% 
+  slice(14:nrow(.)) %>%                      # drop meta data
+  mutate(across(everything(), as.numeric))
+
+```
+
+
+## ETF Return MNS = 0.60 BP = 0.25 0.50 0.75
+```{r etf_return_mns060, comment=NA, warning=FALSE, message=FALSE}
+etf_return_mns060_bp025 = etf %>% 
+  select(all_of(seq(723, 840, 3))) %>% 
+  slice(14:nrow(.)) %>%                      # drop meta data
+  mutate(across(everything(), as.numeric))
+
+etf_return_mns060_bp050 = etf %>% 
+  select(all_of(seq(843, 960, 3))) %>% 
+  slice(14:nrow(.)) %>%                      # drop meta data
+  mutate(across(everything(), as.numeric))
+
+etf_return_mns060_bp075 = etf %>% 
+  select(all_of(seq(963, 1081, 3))) %>% 
+  slice(14:nrow(.)) %>%                      # drop meta data
+  mutate(across(everything(), as.numeric))
+
+```
+
+## ETF Volatility MNS = 0.60 BP = 0.25 0.50 0.75
+```{r etf_vol_mns060, comment=NA, warning=FALSE, message=FALSE}
+etf_vol_mns060_bp025 = etf %>% 
+  select(all_of(seq(724, 841, 3))) %>% 
+  slice(14:nrow(.)) %>%                      # drop meta data
+  mutate(across(everything(), as.numeric))
+
+etf_vol_mns060_bp050 = etf %>% 
+  select(all_of(seq(844, 961, 3))) %>% 
+  slice(14:nrow(.)) %>%                      # drop meta data
+  mutate(across(everything(), as.numeric))
+
+etf_vol_mns060_bp075 = etf %>% 
+  select(all_of(seq(964, 1081, 3))) %>% 
+  slice(14:nrow(.)) %>%                      # drop meta data
+  mutate(across(everything(), as.numeric))
+
+```
+
+
+
+```{r saveSensitivity}
+#plot_convoluted_columns3(afm_vol_mns040_bp075, etf_vol_mns040_bp075, '/Users/alina/Desktop/vol_mns040_bp075.pdf')
+#plot_convoluted_columns3(afm_vol_mns060_bp075, etf_vol_mns060_bp075, '/Users/alina/Desktop/vol_mns060_bp075.pdf')
+```
+
+```{r summaryStats_mns04}
+afm_vol_mns040_summary = summary_stats(afm_vol_mns040_bp075)
+etf_vol_mns040_summary = summary_stats(etf_vol_mns040_bp075)
+```
+
+```{r afm_vol_mns040_plot}
+afm_vol_mns040_summary %>% 
+  select(mean, sd) %>% # shapiro_p, ad_p is > 0.05) so not included
+  plot_function()
+```
+
+```{r etf_vol_mns040_plot}
+etf_vol_mns040_summary %>% 
+  select(mean, sd) %>% # shapiro_p, ad_p is > 0.05) so not included
+  plot_function()
+```
+
+```{r summaryStats_mns06}
+afm_vol_mns060_summary = summary_stats(afm_vol_mns060_bp075)
+etf_vol_mns060_summary = summary_stats(etf_vol_mns060_bp075)
+```
+
+
+```{r afm_vol_mns060_plot}
+afm_vol_mns060_summary %>% 
+  select(mean, sd) %>% # shapiro_p, ad_p is > 0.05) so not included
+  plot_function()
+```
+```{r etf_vol_mns060_plot}
+etf_vol_mns060_summary %>% 
+  select(mean, sd) %>% # shapiro_p, ad_p is > 0.05) so not included
+  plot_function()
+```
+
+
+```{r compareCols_mns040}
+compare_cols(afm_vol_mns040_bp025, etf_vol_mns040_bp025) %>% # uncomment to see t or levene or both
+  filter(t_p < 0.05) # # 38 runs out of 40 run where test p is less than 0.05
+  #filter(levene_p < 0.05) # # 38 runs out of 40 run where test p is less than 0.05 
+  #filter(t_p < 0.05 & levene_p < 0.05) # 38 runs out of 40 that both t and levene p are less than 0.05
+
+```
+```{r compareCols_mns060}
+compare_cols(afm_vol_mns060_bp025, etf_vol_mns060_bp025) %>% 
+  #filter(t_p < 0.05) # 34 runs out of 40 run where test p is less than 0.05 
+  #filter(levene_p < 0.05) # whereas 38 runs out of 40 run where test p is less than 0.05
+  filter(t_p < 0.05 & levene_p < 0.05) # 34 runs out of 40 run where both p-values for both t and levene are less than 0.05 
+```
+
+
+
+
+
+```{r computeGarchResults}
+
+compare_cols_garch <- function(df1, df2) {
+
+  common_cols <- intersect(colnames(df1), colnames(df2))
+  out <- vector("list", length(common_cols))
+
+  # Define GARCH(1,1) specification
+  spec <- ugarchspec(variance.model = list(model = "sGARCH", garchOrder = c(1,1)),
+                     mean.model     = list(armaOrder = c(0,0), include.mean = TRUE),
+                     distribution.model = "norm")
+
+  for (j in seq_along(common_cols)) {
+    nm <- common_cols[j]
+    x  <- na.omit(df1[[nm]])
+    y  <- na.omit(df2[[nm]])
+
+    if (length(x) < 20 || length(y) < 20) {  # GARCH needs enough data
+      out[[j]] <- data.frame(
+        variable = nm,
+        omega1 = NA, alpha1 = NA, beta1 = NA,
+        omega2 = NA, alpha2 = NA, beta2 = NA
+      )
+      next
+    }
+
+    fit1 <- tryCatch(ugarchfit(spec, x, solver = "hybrid"), error = function(e) NULL)
+    fit2 <- tryCatch(ugarchfit(spec, y, solver = "hybrid"), error = function(e) NULL)
+
+    if (is.null(fit1) || is.null(fit2)) {
+      out[[j]] <- data.frame(
+        variable = nm,
+        omega1 = NA, alpha1 = NA, beta1 = NA,
+        omega2 = NA, alpha2 = NA, beta2 = NA
+      )
+      next
+    }
+
+    coef1 <- coef(fit1)
+    coef2 <- coef(fit2)
+
+    out[[j]] <- data.frame(
+      variable = nm,
+      omega1 = coef1["omega"], alpha1 = coef1["alpha1"], beta1 = coef1["beta1"],
+      omega2 = coef2["omega"], alpha2 = coef2["alpha1"], beta2 = coef2["beta1"]
+    )
+  }
+
+  do.call(rbind, out)
+}
+
+```
+
+```{r compareGarch_mns020_bp025}
+garch_mns020_bp025 = compare_cols_garch(afm_vol_mns020_bp025, etf_vol_mns020_bp025)
+
+```
+
+
+```{r printGarch_mns020_bp025}
+garch_mns020_bp025 %>% 
+  select(alpha1) %>% 
+  plot_function()
+
+```
+
+```{r simpleLineComparison}
+
+plot_compare_lines_all <- function(df1, df2) {
+
+  common_cols <- intersect(colnames(df1), colnames(df2))
+
+  for (column_name in common_cols) {
+    x <- df1[[column_name]]
+    y <- df2[[column_name]]
+    n <- min(length(x), length(y))  # align length
+    
+    # Compute mean and sd
+    mean1 <- round(mean(x), 3)
+    sd1   <- round(sd(x), 3)
+    mean2 <- round(mean(y), 3)
+    sd2   <- round(sd(y), 3)
+    
+    df_plot <- data.frame(
+      time = 1:n,
+      AFM = x[1:n],
+      ETF = y[1:n]
+    )
+
+    df_long <- pivot_longer(df_plot, cols = c("AFM", "ETF"),
+                            names_to = "model", values_to = "value")
+
+    p <- ggplot(df_long, aes(x = time, y = value, color = model)) +
+      geom_line(linewidth = .7) +
+      labs(  
+        title = paste0("Model comparison (mean ± std): ",
+                       "AFM (", mean1, " ± ", sd1, ") vs ",
+                       "ETF (", mean2, " ± ", sd2, ")"),
+        x = "Time",
+        y = column_name) +
+      theme_minimal()
+
+    print(p)
+  }
+}
+
+```
+
+```{r saveANDexportLineFunction}
+
+plot_compare_lines_wrapped <- function(df1, df2, output_file = NULL) {
+
+  common_cols <- intersect(colnames(df1), colnames(df2))
+  plot_list <- list()
+
+  for (column_name in common_cols) {
+    x <- na.omit(df1[[column_name]])
+    y <- na.omit(df2[[column_name]])
+    n <- min(length(x), length(y))
+
+    if (n < 2) next
+
+    mean1 <- round(mean(x), 4)
+    sd1   <- round(sd(x), 4)
+    mean2 <- round(mean(y), 4)
+    sd2   <- round(sd(y), 4)
+
+    df_plot <- data.frame(
+      time = 1:n,
+      AFM = x[1:n],
+      ETF = y[1:n]
+    )
+
+    df_long <- pivot_longer(df_plot, cols = c("AFM", "ETF"),
+                            names_to = "model", values_to = "value")
+
+    p <- ggplot(df_long, aes(x = time, y = value, color = model)) +
+      geom_line(linewidth = .5) +
+      labs(
+        title = paste0("AFM(",mean1,"±",sd1,") vs ",
+                       "ETF(",mean2,"±",sd2,")"),
+        x = "Time",
+        y = column_name
+      ) +
+      theme_minimal() +
+      theme(plot.title = element_text(size = 8),
+            axis.text = element_text(size = 6),
+            axis.title = element_text(size = 7),
+            legend.position = "none")
+
+    plot_list[[column_name]] <- p
+  }
+
+  combined_plot <- wrap_plots(plot_list, ncol = 8)
+
+  if (!is.null(output_file)) {
+    ggsave(output_file, combined_plot, width = 16, height = 10, units = "in")
+  } else {
+    print(combined_plot)
+  }
+}
+
+
+```
+
+
+```{r vol_comparison_mns020_bp025}
+# change different dataset for visualization
+plot_compare_lines_wrapped(afm_vol_mns020_bp025, etf_vol_mns020_bp025)
+```
+
+```{r vol_garch_mns020_bp025}
+compare_cols_garch(afm_vol_mns020_bp025, etf_vol_mns020_bp025) %>% 
+  select(alpha1, alpha2) %>% 
+  na.omit() %>%  # remove NA rows if any
+  { t.test(.$alpha1, .$alpha2, paired = TRUE) }
+```
+
+```{r vol_comparison_mns040_bp025}
+# change different dataset for visualization
+plot_compare_lines_wrapped(afm_vol_mns040_bp025, etf_vol_mns040_bp025)
+```
+
+
+```{r vol_garch_mns040_bp025}
+
+compare_cols_garch(afm_vol_mns040_bp025, etf_vol_mns040_bp025) %>% 
+  select(alpha1, alpha2) %>% 
+  na.omit() %>%  # remove NA rows if any
+  { t.test(.$alpha1, .$alpha2, paired = TRUE) }
+
+```
+
+
+```{r vol_comparison_mns060_bp025}
+
+plot_compare_lines_wrapped(afm_vol_mns060_bp025, etf_vol_mns060_bp025)
+```
+```{r vol_garch_mns060_bp025}
+
+compare_cols_garch(afm_vol_mns060_bp025, etf_vol_mns060_bp025) %>% 
+  select(alpha1, alpha2) %>% 
+  na.omit() %>%  # remove NA rows if any
+  { t.test(.$alpha1, .$alpha2, paired = TRUE) }
+
+```
+
+We acknowledge the importance of assessing the impact of simulation repetition. To address this, we ran 40 independent simulations per model (AFM and ETF) across varying levels of maximum news sensitivity (MNS = 0.2, 0.4, 0.6), and compared volatility responses using the GARCH $\alpha_1$ parameter.  
+
+Our results show that as MNS increases, the average volatility responses of both models converge — evidenced by decreasing t-statistics (from 9.19 to 3.10) and increasing p-values (from 2.67e-11 to 0.0036). However, despite this convergence in mean behavior, the distributional spread remains significantly different.  
+
+This is visually supported by the height and narrowness of the probability density curves: ETF volatility distributions tend to be taller and narrower, indicating lower standard deviation, while AFM distributions are flatter and wider, reflecting greater dispersion. These differences in spread and tail behavior persist across MNS levels, suggesting that the core structural differences between models are robust even with increased repetition.
+
+\begin{table}[ht]
+\centering
+\caption{Paired t-test Results for GARCH $\alpha_1$ Between AFM and ETF Models Across MNS Levels}
+\begin{tabular}{lcccccc}
+\hline
+\textbf{MNS} & \textbf{t-statistic} & \textbf{df} & \textbf{p-value} & \textbf{95\% CI} & \textbf{Mean Diff.} & \textbf{Conclusion} \\
+\hline
+0.20 & 9.1865 & 39 & $2.67 \times 10^{-11}$ & [0.1531,\ 0.2480] & 0.2005 & Significant \\
+0.40 & 6.4953 & 39 & $1.06 \times 10^{-7}$  & [0.1026,\ 0.1911] & 0.1468 & Significant \\
+0.60 & 3.1008 & 39 & 0.003577              & [0.0382,\ 0.1815] & 0.1098 & Moderate \\
+\hline
+\end{tabular}
+\end{table}
+
+
+# Table 1. Summary of Augmented Dickey-Fuller (ADF) Test Statistics for Volatility Series
+
+```{r adf_summary_function}
+
+adf_summary_pivot <- function(df1, df2) {
+  if (!requireNamespace("tseries", quietly = TRUE)) {
+    stop("Please install the 'tseries' package: install.packages('tseries')")
+  }
+
+  common_cols <- intersect(colnames(df1), colnames(df2))
+  results <- list()
+
+  for (col in common_cols) {
+    x <- na.omit(df1[[col]])
+    y <- na.omit(df2[[col]])
+
+    if (length(x) < 2 || length(y) < 2) next
+
+    adf_x <- adf.test(x)
+    adf_y <- adf.test(y)
+
+    results[[col]] <- data.frame(
+      RUN = col,
+      model = c("AFM", "ETF"),
+      ADF_stat = round(c(adf_x$statistic, adf_y$statistic), 3),  ## ADF test
+      p_value  = round(c(adf_x$p.value, adf_y$p.value), 3)       ## P-value
+    )
+  }
+
+  df_long <- bind_rows(results)
+
+  df_wide <- df_long %>%
+    pivot_wider(
+      names_from = model,
+      values_from = c(ADF_stat, p_value),
+      names_sep = "_"
+    )
+
+  return(df_wide)
+}
+
+
+```
+
+## Table 1(a) MNS = 0.20
+```{r adf_vol_mns020_bp025, warning=FALSE, message=FALSE}
+adf_summary_pivot(afm_vol_mns020_bp025, etf_vol_mns020_bp025) %>% 
+  #print(n=Inf) # results only displayed, so comment for following lines to run
+  select(ADF_stat_AFM, ADF_stat_ETF) %>% 
+  # TEST 1 (mean and std for ADF Coef)
+  #summarize(
+  #  mean_ADF_AFM = mean(ADF_stat_AFM, na.rm = TRUE), #-7.80115	
+  #  sd_ADF_AFM   = sd(ADF_stat_AFM, na.rm = TRUE),   # 0.5236565
+  #  mean_ADF_ETF = mean(ADF_stat_ETF, na.rm = TRUE), # -8.04185
+  #  sd_ADF_ETF   = sd(ADF_stat_ETF, na.rm = TRUE))   # 0.7936946	
+  # comment group_by and summarize to run following more test
+  ###### USE HIGHLIGHT and run RUN SELECTED LINES from command for TEST 1 
+  
+  # TEST 2 (t-stat for stationarity for ADF coef different)
+  # More test: The ADF test results suggest that the degree of stationarity in 
+  # volatility between the AFM and ETF models does not differ significantly.
+  na.omit() %>%  # remove NA rows if any
+  { t.test(.$ADF_stat_AFM, .$ADF_stat_ETF, paired = TRUE) } 
+# t = 1.8054, df = 39, p-value = 0.07873
+  # 95 percent confidence interval:
+  # -0.02896481  0.51036481
+  # mean difference 0.2407
+```
+
+```{r adf_vol_mns020_bp050, warning=FALSE, message=FALSE}
+adf_summary_pivot(afm_vol_mns020_bp050, etf_vol_mns020_bp050) %>% 
+  select(ADF_stat_AFM, ADF_stat_ETF) %>% 
+  # TEST 1 (mean and std for ADF Coef)
+  #summarize(
+  #  mean_ADF_AFM = mean(ADF_stat_AFM, na.rm = TRUE), #-7.811925
+  #  sd_ADF_AFM   = sd(ADF_stat_AFM, na.rm = TRUE),   # 0.6190395	
+  #  mean_ADF_ETF = mean(ADF_stat_ETF, na.rm = TRUE), # -7.8821
+  #  sd_ADF_ETF   = sd(ADF_stat_ETF, na.rm = TRUE))   # 1.25266		
+  # comment group_by and summarize to run following more test
+  
+  # TEST 2 (t-stat for stationarity for ADF coef different)
+  # More test: The ADF test results suggest that the degree of stationarity in 
+  # volatility between the AFM and ETF models does not differ significantly.
+  na.omit() %>%  # remove NA rows if any
+  { t.test(.$ADF_stat_AFM, .$ADF_stat_ETF, paired = TRUE) } 
+  # t = 0.31262, df = 39, p-value = 0.7562
+  # 95 percent confidence interval:
+  # -0.3838681  0.5242181
+  # mean difference 0.070175 
+  
+```
+
+```{r adf_vol_mns020_bp075, warning=FALSE, message=FALSE}
+adf_summary_pivot(afm_vol_mns020_bp075, etf_vol_mns020_bp075) %>% 
+  # TEST 1 (mean and std for ADF Coef)
+  #summarize(
+  #  mean_ADF_AFM = mean(ADF_stat_AFM, na.rm = TRUE), # -7.328725	
+  #  sd_ADF_AFM   = sd(ADF_stat_AFM, na.rm = TRUE),   # 0.6168214	
+  #  mean_ADF_ETF = mean(ADF_stat_ETF, na.rm = TRUE), # -7.751875	
+  #  sd_ADF_ETF   = sd(ADF_stat_ETF, na.rm = TRUE))   # 0.7860449			
+  # comment group_by and summarize to run following more test
+  
+  # TEST 2 (t-stat for stationarity for ADF coef different)
+  # More test: The ADF test results suggest that the degree of stationarity in 
+  # volatility between the AFM and ETF models does not differ significantly.
+  na.omit() %>%  # remove NA rows if any
+  { t.test(.$ADF_stat_AFM, .$ADF_stat_ETF, paired = TRUE) } 
+  # t = 2.4737, df = 39, p-value = 0.01783
+  # 95 percent confidence interval:
+  # 0.07715172 0.76914828
+  # mean difference 0.42315 
+
+```
+
+
+
+## Table 1(b) BP = 0.25
+
+```{r adf_vol_mns040_bp025, warning=FALSE, message=FALSE}
+adf_summary_pivot(afm_vol_mns040_bp025, etf_vol_mns040_bp025) %>% 
+  select(ADF_stat_AFM, ADF_stat_ETF) %>% 
+  # TEST 1 (mean and std for ADF Coef)
+  #summarize(
+  #  mean_ADF_AFM = mean(ADF_stat_AFM, na.rm = TRUE), #-8.16455
+  #  sd_ADF_AFM   = sd(ADF_stat_AFM, na.rm = TRUE),   # 0.5877581		
+  #  mean_ADF_ETF = mean(ADF_stat_ETF, na.rm = TRUE), # -7.819675
+  #  sd_ADF_ETF   = sd(ADF_stat_ETF, na.rm = TRUE))   # 0.8951759		
+  # comment group_by and summarize to run following more test
+  
+  
+  
+  # TEST 2 (t-stat for stationarity for ADF coef different)
+  # More test: The ADF test results suggest that the degree of stationarity in 
+  # volatility between the AFM and ETF models does not differ significantly.
+  na.omit() %>%  # remove NA rows if any
+  { t.test(.$ADF_stat_AFM, .$ADF_stat_ETF, paired = TRUE) } 
+  # t = -2.0975, df = 39, p-value = 0.04248
+  # 95 percent confidence interval:
+  # -0.67745335 -0.01229665
+  # mean difference -0.344875 
+  
+```
+
+```{r adf_vol_mns060_bp025, warning=FALSE, message=FALSE}
+adf_summary_pivot(afm_vol_mns060_bp025, etf_vol_mns060_bp025) %>% 
+  # TEST 1 (mean and std for ADF Coef)
+  #summarize(
+  #  mean_ADF_AFM = mean(ADF_stat_AFM, na.rm = TRUE), # -8.361225		
+  #  sd_ADF_AFM   = sd(ADF_stat_AFM, na.rm = TRUE),   #0.5616078		
+  #  mean_ADF_ETF = mean(ADF_stat_ETF, na.rm = TRUE), # -8.123475		
+  #  sd_ADF_ETF   = sd(ADF_stat_ETF, na.rm = TRUE))   # 0.8551565				
+  # comment group_by and summarize to run following more test
+  
+  # TEST 2 (t-stat for stationarity for ADF coef different)
+  # More test: The ADF test results suggest that the degree of stationarity in 
+  # volatility between the AFM and ETF models does not differ significantly.
+  na.omit() %>%  # remove NA rows if any
+  { t.test(.$ADF_stat_AFM, .$ADF_stat_ETF, paired = TRUE) } 
+  # t = -1.5175, df = 39, p-value = 0.1372
+  # 95 percent confidence interval:
+  #  -0.55465884  0.07915884
+  # mean difference -0.23775 
+
+```
+
+\begin{table}[ht]
+\centering
+\caption{Paired t-test Results Comparing ADF Statistics Between AFM and ETF Models}
+\begin{tabular}{cccc}
+\toprule
+\textbf{MNS} & \textbf{BP} & \textbf{t-statistic} & \textbf{p-value} \\
+\midrule
+0.20 & 0.25 &  1.8054  & 0.07873 \\
+0.20 & 0.50 &  0.3126  & 0.75620 \\
+0.20 & 0.75 &  2.4737  & 0.01783 \\
+0.40 & 0.25 & -2.0975  & 0.04248 \\
+0.60 & 0.25 & -1.5175  & 0.13720 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+
+## TABLE II 
+
+```{r adjust_kruskal_function}
+
+adjust_kruskal_pvalues <- function(df1, df2) {
+  common_cols <- intersect(colnames(df1), colnames(df2))
+  results <- list()
+  
+  for (col in common_cols) {
+    x <- na.omit(df1[[col]])
+    y <- na.omit(df2[[col]])
+    group <- rep(c("AFM", "ETF"), c(length(x), length(y)))
+    value <- c(x, y)
+    
+    if (length(x) < 2 || length(y) < 2) next
+    
+    kruskal_p <- kruskal.test(value ~ group)$p.value
+    results[[col]] <- data.frame(RUN = col, Kruskal_p = kruskal_p)
+  }
+  
+  df_out <- do.call(rbind, results)
+  # Benjamin-Hockberg adjustmentdit
+  df_out$Kruskal_p_adj <- p.adjust(df_out$Kruskal_p, method = "BH")   
+  return(df_out)
+}
+
+```
+
+
+
+
+```{r noadjusted_kruskal_mns020}
+# MNS 0.20 and BP = 0.25
+adjust_kruskal_pvalues(afm_vol_mns020_bp025, etf_vol_mns020_bp025) %>% 
+  select(Kruskal_p, Kruskal_p_adj) %>% 
+  # filter(Kruskal_p<0.05)               # not adjusted = 17 out of 40
+  #filter(Kruskal_p_adj < 0.05)           # adjusted 13 out of 40
+  summarize(
+    mean_unadjusted = mean(Kruskal_p, na.rm = TRUE), # 0.2174916		
+    sd_unadjusted   = sd(Kruskal_p, na.rm = TRUE),   # 0.3285393		
+    mean_adjusted = mean(Kruskal_p_adj, na.rm = TRUE), # 0.2607127		
+    sd_adjusted   = sd(Kruskal_p_adj, na.rm = TRUE))   # 0.3391118	
+
+
+# MNS 0.20 and BP = 0.50
+adjust_kruskal_pvalues(afm_vol_mns020_bp050, etf_vol_mns020_bp050)%>% 
+  select(Kruskal_p, Kruskal_p_adj) %>% # 40 out of 40
+  # filter(Kruskal_p<0.05)               # not adjusted = 39 out of 40
+  # filter(Kruskal_p_adj < 0.05)           # adjusted 39 out of 40
+  summarize(
+    mean_unadjusted = mean(Kruskal_p, na.rm = TRUE), # 0.00374543		
+    sd_unadjusted   = sd(Kruskal_p, na.rm = TRUE),   # 0.01619828	
+    mean_adjusted = mean(Kruskal_p_adj, na.rm = TRUE), # 0.003809924		
+    sd_adjusted   = sd(Kruskal_p_adj, na.rm = TRUE))   # 0.01624308	
+
+
+# MNS 0.20 and BP = 0.75
+adjust_kruskal_pvalues(afm_vol_mns020_bp075, etf_vol_mns020_bp075)%>% 
+  select(Kruskal_p, Kruskal_p_adj) %>% # 40 out of 40
+  #filter(Kruskal_p<0.05)               # not adjusted = 40 out of 40
+  #filter(Kruskal_p_adj < 0.05)           # adjusted 40 out of 40
+  summarize(
+    mean_unadjusted = mean(Kruskal_p, na.rm = TRUE), # 0.002781504		
+    sd_unadjusted   = sd(Kruskal_p, na.rm = TRUE),   # 0.008024138		
+    mean_adjusted = mean(Kruskal_p_adj, na.rm = TRUE), # 0.002893344		
+    sd_adjusted   = sd(Kruskal_p_adj, na.rm = TRUE))   # 0.008247071	
+```
+We conducted Kruskal–Wallis tests across 40 independent simulation runs to assess distributional differences in volatility between the AFM and ETF models. Initially, 17 out of 40 runs showed p-values below 0.05, indicating potential distributional differences in volatility between the two models. However, after applying the Benjamini-Hochberg adjustment to correct for multiple comparisons, only 13 of these runs remained statistically significant. This suggests that 4 of the initially significant results were likely false positives (Type I errors). Therefore, our updated interpretation is that statistically significant distributional differences in volatility exist in 13 out of 40 runs, indicating true divergence in model behavior under those specific conditions. While lower base propensity (BP = 0.25) showed significant differences in only a subset of runs, increasing BP to 0.50 and 0.75 led to consistent and robust statistical differences in volatility distributions across all 40 runs, indicating stronger model divergence under these conditions.
+
+```{r noadjusted_kruskal_bp025}
+# MNS 0.40 and BP = 0.25
+adjust_kruskal_pvalues(afm_vol_mns040_bp025, etf_vol_mns040_bp025)%>% 
+  select(Kruskal_p, Kruskal_p_adj) %>% 
+  #filter(Kruskal_p < 0.05)         # 29 out of 40
+  #filter(Kruskal_p_adj < 0.05) %>% # 28 out of 40
+  summarize(
+    mean_unadjusted = mean(Kruskal_p, na.rm = TRUE), # 0.1170658			
+    sd_unadjusted   = sd(Kruskal_p, na.rm = TRUE),   # 0.2453947		
+    mean_adjusted = mean(Kruskal_p_adj, na.rm = TRUE), # 0.1272112		
+    sd_adjusted   = sd(Kruskal_p_adj, na.rm = TRUE))   # 0.2555004	
+
+# MNS 0.60 and BP = 0.25
+adjust_kruskal_pvalues(afm_vol_mns060_bp025, etf_vol_mns060_bp025)%>% 
+  select(Kruskal_p, Kruskal_p_adj) %>% 
+  #filter(Kruskal_p < 0.05)      # 31 out of 40
+  #filter(Kruskal_p_adj < 0.05)  # 31 out of 40
+   summarize(
+    mean_unadjusted = mean(Kruskal_p, na.rm = TRUE), # 0.0833404			
+    sd_unadjusted   = sd(Kruskal_p, na.rm = TRUE),   # 0.1834091			
+    mean_adjusted = mean(Kruskal_p_adj, na.rm = TRUE), # 0.09016467		
+    sd_adjusted   = sd(Kruskal_p_adj, na.rm = TRUE))   # 0.1899817		
+
+```
+When comparing volatility distributions between models, increasing the level of MNS while holding BP constant reveals a clear trend in divergence. Specifically, with MNS = 0.40 and BP = 0.25, 28 out of 40 runs show statistically significant distributional differences after Benjamini-Hochberg adjustment. As news sensitivity increases to MNS = 0.60 (with BP still at 0.25), the number of significant runs rises to 31 out of 40. This suggests that greater sensitivity to news increases the divergence in volatility behavior between the models, reinforcing the robustness of observed distributional differences across multiple simulation runs.  
+
+However, the increase in significant distributional differences is more gradual with rising MNS compared to changes in BP. While higher MNS does lead to greater divergence in volatility between models, the effect appears incremental—moving from 17 to 28 to 31 significant runs as MNS increases from 0.20 to 0.60 (with BP held constant at 0.25). In contrast, changes in BP have a more immediate and pronounced impact: at BP = 0.50 and 0.75, nearly all 40 runs show statistically significant differences. This suggests that BP exerts a stronger and more rapid influence on volatility dynamics than MNS.
+
+
+
+```{r adf_return_mns020_bp025, warning=FALSE, message=FALSE}
+adf_summary_pivot(afm_return_mns040_bp025, etf_return_mns040_bp025) %>% 
+   # TEST 1 (mean and std for ADF Coef)
+  #summarize(
+  #  mean_ADF_AFM = mean(ADF_stat_AFM, na.rm = TRUE), # -8.361225		
+  #  sd_ADF_AFM   = sd(ADF_stat_AFM, na.rm = TRUE),   #0.5616078		
+  #  mean_ADF_ETF = mean(ADF_stat_ETF, na.rm = TRUE), # -8.123475		
+  #  sd_ADF_ETF   = sd(ADF_stat_ETF, na.rm = TRUE))   # 0.8551565				
+  # comment group_by and summarize to run following more test
+  
+  # TEST 2 (t-stat for stationarity for ADF coef different)
+  # More test: The ADF test results suggest that the degree of stationarity in 
+  # volatility between the AFM and ETF models does not differ significantly.
+  na.omit() %>%  # remove NA rows if any
+  { t.test(.$ADF_stat_AFM, .$ADF_stat_ETF, paired = TRUE) } 
+  # t = -1.5175, df = 39, p-value = 0.1372
+  # 95 percent confidence interval:
+  #  -0.55465884  0.07915884
+  # mean difference -0.23775 
+
+
+```
